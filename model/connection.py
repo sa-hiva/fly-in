@@ -1,8 +1,9 @@
 from pydantic import BaseModel, Field, model_validator
-from model import ZoneNotInConnectionError
+from .exceptions import ZoneNotInConnectionError
 
 
 class Connection(BaseModel):
+    name: str
     endpoints: frozenset[str]
     max_link_capacity: int = Field(ge=1, default=1)
 

@@ -1,0 +1,7 @@
+# Closing bracket without opening one
+nb_drones: 2
+start_hub: start 0 0
+end_hub: goal 2 0
+hub: middle 1 0 color=blue]
+connection: start-middle
+connection: middle-goal

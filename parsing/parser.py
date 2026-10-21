@@ -78,17 +78,13 @@ class Parser:
         self.nb_drones = n
 
     def _parse_zone(self, line_number: int, key: str, value: str) -> None:
-        if "[" in value:
-            main_part, metadata_part = value.split("[", 1)
-            metadata_part = metadata_part.rstrip("]")
-        else:
-            main_part = value
-            metadata_part = ""
-
+        
+        main_part, metadata_part = self._split_value_metadata(
+        line_number, key, value)
         arguments = main_part.strip().split()
 
-        if len(arguments) < 3:
-            raise ParseError(line_number, "at least 3 arguments "
+        if len(arguments) != 3:
+            raise ParseError(line_number, "exactly 3 basic arguments "
                              "are required: <name> <x> <y>")
 
         name = arguments[0]
@@ -156,19 +152,16 @@ class Parser:
         self.zones.append(zone)
 
     def _parse_connection(self, line_number: int, value: str) -> None:
-        if "[" in value:
-            main_part, metadata_part = value.split("[", 1)
-            metadata_part = metadata_part.rstrip("]")
-        else:
-            main_part = value
-            metadata_part = ""
-
+        main_part, metadata_part = self._split_value_metadata(
+                    line_number, "connection", value)
+        
         arguments = main_part.strip().split("-")
         if len(arguments) != 2:
             raise ParseError(line_number, "connections must connect "
                              "exactly 2 zones: <zone1>-<zone2>")
         zone1 = arguments[0]
         zone2 = arguments[1]
+        name = f"{zone1}-{zone2}"
 
         if zone1 not in self.zone_names:
             raise ParseError(line_number, f"zone {zone1} in "
@@ -192,7 +185,8 @@ class Parser:
                                         ["max_link_capacity"])
         max_links_value = metadata.get("max_link_capacity", 1)
         try:
-            connection = Connection(endpoints=pair,
+            connection = Connection(name=name,
+                                    endpoints=pair,
                                     max_link_capacity=cast(
                                         int,
                                         max_links_value
@@ -202,6 +196,29 @@ class Parser:
             raise self._translate_validation_error(line_number,
                                                    error) from error
         self.connections.append(connection)
+
+    def _split_value_metadata(self,
+                              line_number: int,
+                              key: str,
+                              value: str) -> tuple[str, str]:
+        if "[" not in value:
+            if "]" in value:
+                raise ParseError(line_number, "invalid character ']' found")
+            return value, ""
+        self._validate_value_metadata(value, line_number, key)
+        main_part, metadata_part = value.split("[", 1)
+        return main_part, metadata_part.rstrip("]")
+
+    def _validate_value_metadata(self,
+                                 value: str,
+                                 line_number: int,
+                                 key: str) -> None:
+        if value.count("[") > 1 or value.count("]") != 1:
+            raise ParseError(line_number, f"invalid format for {key}: "
+                             "metadata must be inside single brackets []")
+        if value.split("]")[1].strip():
+            raise ParseError(line_number, f"invalid argument for {key}: "
+                             "no more text allowed after metadata")
 
     def _parse_metadata(
             self,
